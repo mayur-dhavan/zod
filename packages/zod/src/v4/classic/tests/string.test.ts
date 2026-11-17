@@ -588,6 +588,30 @@ test("httpurl", () => {
   expect(() => httpUrl.parse("http:/example.com")).toThrow();
 });
 
+test("http protocol guard applies to narrowed http(s) protocol regexes", () => {
+  // z.httpUrl({ normalize: false }) requires ://; a schema narrowed to HTTPS only must not lose that guard
+  const httpsOnly = z.url({ normalize: false, protocol: /^https$/ });
+  expect(httpsOnly.safeParse("https://example.com").success).toBe(true);
+  expect(httpsOnly.safeParse("https:example.com").success).toBe(false);
+  expect(httpsOnly.safeParse("https:/example.com").success).toBe(false);
+  expect(httpsOnly.safeParse("https:\\example.com").success).toBe(false);
+  // inputs the narrowed protocol does not accept are still rejected after parsing
+  expect(httpsOnly.safeParse("http://example.com").success).toBe(false);
+  expect(httpsOnly.safeParse("http:example.com").success).toBe(false);
+  // non-http(s) schemes are unaffected by the guard
+  const ftpOnly = z.url({ normalize: false, protocol: /^ftp$/ });
+  expect(ftpOnly.safeParse("ftp://example.com").success).toBe(true);
+});
+
+test("http protocol guard leaves protocol regex state untouched", () => {
+  // a global protocol regex must behave identically across repeated parses (no lastIndex leakage)
+  const httpsGlobal = z.url({ normalize: false, protocol: /^https$/g });
+  for (let i = 0; i < 3; i++) {
+    expect(httpsGlobal.safeParse("https://example.com").success).toBe(true);
+    expect(httpsGlobal.safeParse("https:example.com").success).toBe(false);
+  }
+});
+
 test("url error overrides", () => {
   try {
     z.string().url().parse("https");

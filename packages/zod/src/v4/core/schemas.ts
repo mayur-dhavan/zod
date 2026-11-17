@@ -547,8 +547,11 @@ export function parseURLObject(
   trimmed: string,
   def: Pick<$ZodURLDef, "protocol" | "normalize">
 ): URL | typeof URL_BAD_FORMAT | typeof URL_UNPARSEABLE {
-  // When normalize is off, require :// for http/https URLs. This prevents strings like "http:example.com" or "https:/path" from being silently accepted
-  if (!def.normalize && def.protocol?.source === regexes.httpProtocol.source && !/^https?:\/\//i.test(trimmed)) {
+  // When normalize is off, require :// for http/https URLs. This prevents strings like "http:example.com" or "https:/path" from being silently accepted.
+  // The guard applies to any schema with a protocol constraint, including regexes narrowed to a single http(s)
+  // scheme (for example /^https$/) - not only the default /^https?$/ used by z.httpUrl(). Inputs whose scheme
+  // the protocol rejects stay invalid either way; the guard only classifies them as a bad-format URL up front.
+  if (!def.normalize && def.protocol && /^(https?):/i.test(trimmed) && !/^https?:\/\//i.test(trimmed)) {
     return URL_BAD_FORMAT;
   }
 
